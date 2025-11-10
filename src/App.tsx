@@ -185,12 +185,31 @@ function App() {
           <div className="pane__body output">
             {conversion.error ? (
               <div className="output__error">Invalid JSON: {conversion.error}</div>
-            ) : conversion.toonText ? (
-              <pre className="output__content">{conversion.toonText}</pre>
             ) : (
-              <div className="output__placeholder">
-                TOON conversion will appear here.
-              </div>
+              <>
+                <Editor
+                  className="output__editor"
+                  height="100%"
+                  width="100%"
+                  language="yaml"
+                  theme="vs-dark"
+                  value={conversion.toonText ?? ''}
+                  options={{
+                    readOnly: true,
+                    domReadOnly: true,
+                    minimap: { enabled: false },
+                    fontSize: 13,
+                    tabSize: 2,
+                    wordWrap: 'on',
+                    automaticLayout: true,
+                  }}
+                />
+                {!conversion.toonText ? (
+                  <div className="output__placeholder">
+                    TOON conversion will appear here.
+                  </div>
+                ) : null}
+              </>
             )}
           </div>
         </section>
