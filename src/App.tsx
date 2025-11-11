@@ -6,7 +6,7 @@ import {
   type DragEvent,
 } from 'react'
 import Editor from '@monaco-editor/react'
-import { convertJsonToToon } from './lib/conversion'
+import { convertJsonToToon, convertToonToJson } from './lib/conversion'
 import './App.css'
 
 const INITIAL_JSON = `{
@@ -17,13 +17,54 @@ const INITIAL_JSON = `{
   ]
 }`
 
+type ConversionMode = 'json-to-toon' | 'toon-to-json'
+
 function App() {
-  const [jsonInput, setJsonInput] = useState(INITIAL_JSON)
+  const [mode, setMode] = useState<ConversionMode>('json-to-toon')
+  const [inputText, setInputText] = useState(INITIAL_JSON)
   const [isDragging, setIsDragging] = useState(false)
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
   const [dropMessage, setDropMessage] = useState<string | null>(null)
 
-  const conversion = useMemo(() => convertJsonToToon(jsonInput), [jsonInput])
+  const isJsonToToon = mode === 'json-to-toon'
+
+  const conversion = useMemo(
+    () =>
+      isJsonToToon
+        ? convertJsonToToon(inputText)
+        : convertToonToJson(inputText),
+    [inputText, isJsonToToon],
+  )
+
+  const inputTitle = isJsonToToon ? 'JSON Input' : 'TOON Input'
+  const outputTitle = isJsonToToon ? 'TOON Output' : 'JSON Output'
+  const inputHint = isJsonToToon
+    ? 'Drag & Drop supported (.json)'
+    : 'Drag & Drop supported (.toon, .txt)'
+  const outputPlaceholder = isJsonToToon
+    ? 'TOON conversion will appear here.'
+    : 'JSON conversion will appear here.'
+  const outputLanguage = isJsonToToon ? 'yaml' : 'json'
+  const inputLanguage = isJsonToToon ? 'json' : 'yaml'
+  const copyLabel =
+    copyState === 'copied'
+      ? 'Copied!'
+      : copyState === 'error'
+        ? 'Copy failed'
+        : isJsonToToon
+          ? 'Copy TOON'
+          : 'Copy JSON'
+  const errorPrefix = isJsonToToon ? 'Invalid JSON' : 'Invalid TOON'
+  const inputTokenLabel = isJsonToToon ? 'JSON tokens' : 'TOON tokens'
+  const outputTokenLabel = isJsonToToon ? 'TOON tokens' : 'JSON tokens'
+  const inputTokenCount = isJsonToToon ? conversion.jsonTokens : conversion.toonTokens
+  const outputTokenCount = isJsonToToon ? conversion.toonTokens : conversion.jsonTokens
+  const tokenDelta = outputTokenCount - inputTokenCount
+  const tokenDeltaLabel =
+    tokenDelta > 0 ? `+${tokenDelta}` : tokenDelta.toString()
+  const headerDescription = isJsonToToon
+    ? 'Paste or drop JSON on the left and get deterministic TOON output on the right. Everything stays in your browser.'
+    : 'Paste or drop TOON on the left and get formatted JSON output on the right. Everything stays in your browser.'
 
   useEffect(() => {
     if (copyState === 'idle') {
@@ -38,21 +79,41 @@ function App() {
   }, [copyState])
 
   const handleEditorChange = useCallback((value?: string) => {
-    setJsonInput(value ?? '')
+    setInputText(value ?? '')
   }, [])
 
   const handleCopy = useCallback(async () => {
-    if (!conversion.toonText) {
+    if (!conversion.convertedText) {
       return
     }
 
     try {
-      await navigator.clipboard.writeText(conversion.toonText)
+      await navigator.clipboard.writeText(conversion.convertedText)
       setCopyState('copied')
     } catch {
       setCopyState('error')
     }
-  }, [conversion.toonText])
+  }, [conversion.convertedText])
+
+  const handleModeToggle = useCallback(() => {
+    setMode((previousMode) => {
+      const nextMode =
+        previousMode === 'json-to-toon' ? 'toon-to-json' : 'json-to-toon'
+
+      setInputText((previousInput) => {
+        if (conversion.error || !conversion.convertedText) {
+          return previousInput
+        }
+
+        return conversion.convertedText
+      })
+
+      setCopyState('idle')
+      setDropMessage(null)
+
+      return nextMode
+    })
+  }, [conversion])
 
   const handleDragEnter = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault()
@@ -88,40 +149,66 @@ function App() {
       return
     }
 
-    if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
-      setDropMessage('Unsupported file type. Please drop a .json file.')
-      return
+    if (isJsonToToon) {
+      const isJsonFile =
+        file.type === 'application/json' || file.name.endsWith('.json')
+      if (!isJsonFile) {
+        setDropMessage('Unsupported file type. Please drop a .json file.')
+        return
+      }
+    } else {
+      const isToonFile =
+        !file.type ||
+        file.type === 'text/plain' ||
+        file.type.includes('yaml') ||
+        file.name.endsWith('.toon') ||
+        file.name.endsWith('.txt') ||
+        file.name.endsWith('.yaml') ||
+        file.name.endsWith('.yml')
+
+      if (!isToonFile) {
+        setDropMessage('Unsupported file type. Please drop a TOON file.')
+        return
+      }
     }
 
     file
       .text()
       .then((text) => {
         setDropMessage(null)
-        setJsonInput(text)
+        setInputText(text)
       })
       .catch(() => {
         setDropMessage('Failed to read file. Please try again.')
       })
-  }, [])
+  }, [isJsonToToon])
 
   return (
     <div className="app">
       <header className="app__header">
         <div>
-          <h1>JSON to TOON Converter</h1>
-          <p>
-            Paste or drop JSON on the left and get deterministic TOON output on
-            the right. Everything stays in your browser.
-          </p>
+          <h1>
+            JSON &lt;&gt; TOON Converter
+          </h1>
+          <p>{headerDescription}</p>
         </div>
-        <a
-          className="app__link"
-          href="https://github.com/toon-format/toon#readme"
-          target="_blank"
-          rel="noreferrer"
-        >
-          TOON Specification
-        </a>
+        <div className="app__header-actions">
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={handleModeToggle}
+          >
+            {isJsonToToon ? 'Switch to TOON → JSON' : 'Switch to JSON → TOON'}
+          </button>
+          <a
+            className="app__link"
+            href="https://github.com/toon-format/toon#readme"
+            target="_blank"
+            rel="noreferrer"
+          >
+            TOON Specification
+          </a>
+        </div>
       </header>
 
       <main className="app__workspace">
@@ -134,8 +221,8 @@ function App() {
         >
           <div className="pane__header">
             <div className="pane__title-group">
-              <h2>JSON Input</h2>
-              <span className="pane__hint">Drag & Drop supported (.json)</span>
+              <h2>{inputTitle}</h2>
+              <span className="pane__hint">{inputHint}</span>
               {dropMessage ? (
                 <span className="pane__hint pane__hint--warning">{dropMessage}</span>
               ) : null}
@@ -144,9 +231,9 @@ function App() {
           <div className="pane__body">
             <Editor
               height="100%"
-              language="json"
+              language={inputLanguage}
               theme="vs-dark"
-              value={jsonInput}
+              value={inputText}
               onChange={handleEditorChange}
               options={{
                 minimap: { enabled: false },
@@ -162,38 +249,43 @@ function App() {
         <section className="pane pane--output">
           <div className="pane__header">
             <div className="pane__title-group">
-              <h2>TOON Output</h2>
+              <h2>{outputTitle}</h2>
               <div className="token-stats">
-                <span>JSON tokens: {conversion.jsonTokens}</span>
-                <span>TOON tokens: {conversion.toonTokens}</span>
-                <span>Tokens saved: {conversion.savedTokens}</span>
+                <span>
+                  {inputTokenLabel}: {inputTokenCount}
+                </span>
+                <span>
+                  {outputTokenLabel}: {outputTokenCount}
+                </span>
+                <span>
+                  Token delta:{' '}
+                  {tokenDeltaLabel}
+                </span>
               </div>
             </div>
             <button
               type="button"
               className="button"
               onClick={handleCopy}
-              disabled={!conversion.toonText}
+              disabled={!conversion.convertedText}
             >
-              {copyState === 'copied'
-                ? 'Copied!'
-                : copyState === 'error'
-                  ? 'Copy failed'
-                  : 'Copy TOON'}
+              {copyLabel}
             </button>
           </div>
           <div className="pane__body output">
             {conversion.error ? (
-              <div className="output__error">Invalid JSON: {conversion.error}</div>
+              <div className="output__error">
+                {errorPrefix}: {conversion.error}
+              </div>
             ) : (
               <>
                 <Editor
                   className="output__editor"
                   height="100%"
                   width="100%"
-                  language="yaml"
+                  language={outputLanguage}
                   theme="vs-dark"
-                  value={conversion.toonText ?? ''}
+                  value={conversion.convertedText ?? ''}
                   options={{
                     readOnly: true,
                     domReadOnly: true,
@@ -204,9 +296,9 @@ function App() {
                     automaticLayout: true,
                   }}
                 />
-                {!conversion.toonText ? (
+                {!conversion.convertedText ? (
                   <div className="output__placeholder">
-                    TOON conversion will appear here.
+                    {outputPlaceholder}
                   </div>
                 ) : null}
               </>

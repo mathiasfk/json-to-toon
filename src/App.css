@@ -14,6 +14,13 @@
   gap: 2rem;
 }
 
+.app__header-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
 .app__header h1 {
   margin: 0 0 0.5rem;
   font-size: clamp(2rem, 3vw, 2.75rem);
@@ -89,7 +96,7 @@
 }
 
 .pane--dragging .pane__body::after {
-  content: 'Drop your JSON file';
+  content: 'Drop your file';
   position: absolute;
   inset: 0;
   background: rgba(37, 99, 235, 0.12);
@@ -123,6 +130,17 @@
 .button:not(:disabled):hover {
   transform: translateY(-1px);
   background-color: var(--accent-strong);
+}
+
+.button--ghost {
+  background-color: transparent;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.button--ghost:hover {
+  background-color: rgba(37, 99, 235, 0.12);
+  color: var(--accent-strong);
 }
 
 .token-stats {
@@ -180,5 +198,13 @@
 
   .token-stats {
     flex-wrap: wrap;
+  }
+
+  .app__header-actions {
+    align-items: stretch;
+  }
+
+  .app__link {
+    align-self: flex-start;
   }
 }

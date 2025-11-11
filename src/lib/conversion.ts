@@ -1,7 +1,7 @@
-import { encode } from '@toon-format/toon'
+import { decode, encode } from '@toon-format/toon'
 
 export type ConversionResult = {
-  toonText: string
+  convertedText: string
   jsonTokens: number
   toonTokens: number
   savedTokens: number
@@ -21,7 +21,7 @@ export const convertJsonToToon = (jsonText: string): ConversionResult => {
 
   if (!jsonText.trim()) {
     return {
-      toonText: '',
+      convertedText: '',
       jsonTokens,
       toonTokens: 0,
       savedTokens: 0,
@@ -35,7 +35,7 @@ export const convertJsonToToon = (jsonText: string): ConversionResult => {
     const toonTokens = estimateTokens(toonText)
 
     return {
-      toonText,
+      convertedText: toonText,
       jsonTokens,
       toonTokens,
       savedTokens: Math.max(jsonTokens - toonTokens, 0),
@@ -43,7 +43,7 @@ export const convertJsonToToon = (jsonText: string): ConversionResult => {
     }
   } catch (error) {
     return {
-      toonText: '',
+      convertedText: '',
       jsonTokens,
       toonTokens: 0,
       savedTokens: 0,
@@ -51,6 +51,45 @@ export const convertJsonToToon = (jsonText: string): ConversionResult => {
         error instanceof Error
           ? error.message
           : 'Unknown error while parsing JSON',
+    }
+  }
+}
+
+export const convertToonToJson = (toonText: string): ConversionResult => {
+  const toonTokens = estimateTokens(toonText)
+
+  if (!toonText.trim()) {
+    return {
+      convertedText: '',
+      jsonTokens: 0,
+      toonTokens,
+      savedTokens: 0,
+      error: null,
+    }
+  }
+
+  try {
+    const parsed = decode(toonText)
+    const jsonText = JSON.stringify(parsed, null, 2)
+    const jsonTokens = estimateTokens(jsonText)
+
+    return {
+      convertedText: jsonText,
+      jsonTokens,
+      toonTokens,
+      savedTokens: Math.max(jsonTokens - toonTokens, 0),
+      error: null,
+    }
+  } catch (error) {
+    return {
+      convertedText: '',
+      jsonTokens: 0,
+      toonTokens,
+      savedTokens: 0,
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Unknown error while parsing TOON',
     }
   }
 }
