@@ -191,6 +191,16 @@
     flex-direction: column;
   }
 
+  .pane {
+    min-height: 0;
+    flex: 1 1 0;
+  }
+
+  .pane__body {
+    min-height: 0;
+    flex: 1 1 0;
+  }
+
   .pane__header {
     flex-direction: column;
     align-items: flex-start;
