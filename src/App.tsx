@@ -2,11 +2,14 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type DragEvent,
 } from 'react'
 import Editor from '@monaco-editor/react'
+import type { editor } from 'monaco-editor'
 import { convertJsonToToon, convertToonToJson } from './lib/conversion'
+import { gtag } from './services/analytics'
 import './App.css'
 
 const INITIAL_JSON = `{
@@ -25,6 +28,7 @@ function App() {
   const [isDragging, setIsDragging] = useState(false)
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
   const [dropMessage, setDropMessage] = useState<string | null>(null)
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
 
   const isJsonToToon = mode === 'json-to-toon'
 
@@ -82,6 +86,28 @@ function App() {
     setInputText(value ?? '')
   }, [])
 
+  const handleEditorMount = useCallback((editor: editor.IStandaloneCodeEditor) => {
+    editorRef.current = editor
+  }, [])
+
+  useEffect(() => {
+    const editor = editorRef.current
+    if (!editor) {
+      return
+    }
+
+    const disposable = editor.onDidPaste(() => {
+      const type = isJsonToToon ? 'json' : 'toon'
+      gtag('event', 'paste_input', {
+        type: type,
+      })
+    })
+
+    return () => {
+      disposable.dispose()
+    }
+  }, [isJsonToToon])
+
   const handleCopy = useCallback(async () => {
     if (!conversion.convertedText) {
       return
@@ -90,29 +116,35 @@ function App() {
     try {
       await navigator.clipboard.writeText(conversion.convertedText)
       setCopyState('copied')
+      const type = isJsonToToon ? 'toon' : 'json'
+      gtag('event', 'copy_output', {
+        type: type,
+      })
     } catch {
       setCopyState('error')
     }
-  }, [conversion.convertedText])
+  }, [conversion.convertedText, isJsonToToon])
 
   const handleModeToggle = useCallback(() => {
     setMode((previousMode) => {
       const nextMode =
         previousMode === 'json-to-toon' ? 'toon-to-json' : 'json-to-toon'
 
-      setInputText((previousInput) => {
-        if (conversion.error || !conversion.convertedText) {
-          return previousInput
-        }
-
-        return conversion.convertedText
+      // Track mode switch
+      gtag('event', 'switch_mode', {
+        type: previousMode === 'json-to-toon' ? 'json' : 'toon',
       })
-
-      setCopyState('idle')
-      setDropMessage(null)
 
       return nextMode
     })
+
+    // Update input text with converted text if available
+    if (!conversion.error && conversion.convertedText) {
+      setInputText(conversion.convertedText)
+    }
+
+    setCopyState('idle')
+    setDropMessage(null)
   }, [conversion])
 
   const handleDragEnter = useCallback((event: DragEvent<HTMLDivElement>) => {
@@ -205,6 +237,9 @@ function App() {
             href="https://github.com/toon-format/toon#readme"
             target="_blank"
             rel="noreferrer"
+            onClick={() => {
+              gtag('event', 'click_documentation')
+            }}
           >
             TOON Specification
           </a>
@@ -235,6 +270,7 @@ function App() {
               theme="vs-dark"
               value={inputText}
               onChange={handleEditorChange}
+              onMount={handleEditorMount}
               options={{
                 minimap: { enabled: false },
                 fontSize: 13,
