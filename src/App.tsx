@@ -232,7 +232,7 @@ function App() {
           >
             {isJsonToToon ? 'Switch to TOON → JSON' : 'Switch to JSON → TOON'}
           </button>
-          <a
+          {/* <a
             className="app__link"
             href="https://github.com/toon-format/toon#readme"
             target="_blank"
@@ -242,6 +242,17 @@ function App() {
             }}
           >
             TOON Specification
+          </a> */}
+          <a
+            className="app__link"
+            href="https://smartjsondiff.com"
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => {
+              gtag('event', 'click_json_comparison')
+            }}
+          >
+            Try our JSON comparison tool!
           </a>
         </div>
       </header>
